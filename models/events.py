@@ -3,7 +3,7 @@ This module contains the event types for the Agent User Interaction Protocol Pyt
 """
 
 from enum import Enum
-from typing import Annotated, Any, List, Literal, Optional, Union
+from typing import Annotated, Any, List, Literal, Optional, Union, Dict
 
 from pydantic import Field
 
@@ -55,7 +55,8 @@ class TextMessageStartEvent(BaseEvent):
     """
     type: Literal[EventType.TEXT_MESSAGE_START] = EventType.TEXT_MESSAGE_START  # pyright: ignore[reportIncompatibleVariableOverride]
     message_id: str
-    role: Literal["assistant"] = "assistant"
+    name: Optional[str] = None
+    role: str
 
 
 class TextMessageContentEvent(BaseEvent):
@@ -65,7 +66,8 @@ class TextMessageContentEvent(BaseEvent):
     type: Literal[EventType.TEXT_MESSAGE_CONTENT] = EventType.TEXT_MESSAGE_CONTENT  # pyright: ignore[reportIncompatibleVariableOverride]
     message_id: str
     delta: str = Field(min_length=1)
-
+    name: Optional[str] = None
+    role: str
 
 class TextMessageEndEvent(BaseEvent):
     """
@@ -73,6 +75,9 @@ class TextMessageEndEvent(BaseEvent):
     """
     type: Literal[EventType.TEXT_MESSAGE_END] = EventType.TEXT_MESSAGE_END  # pyright: ignore[reportIncompatibleVariableOverride]
     message_id: str
+    name: Optional[str] = None
+    role: str
+    delta: str
 
 class TextMessageChunkEvent(BaseEvent):
     """
@@ -119,7 +124,7 @@ class ToolCallArgsEvent(BaseEvent):
     type: Literal[EventType.TOOL_CALL_ARGS] = EventType.TOOL_CALL_ARGS  # pyright: ignore[reportIncompatibleVariableOverride]
     tool_call_id: str
     delta: str
-
+    tool_call_name: str
 
 class ToolCallEndEvent(BaseEvent):
     """
@@ -142,11 +147,12 @@ class ToolCallResultEvent(BaseEvent):
     """
     Event containing the result of a tool call.
     """
-    message_id: str
     type: Literal[EventType.TOOL_CALL_RESULT] = EventType.TOOL_CALL_RESULT  # pyright: ignore[reportIncompatibleVariableOverride]
     tool_call_id: str
-    content: str
-    role: Optional[Literal["tool"]] = None
+    delta: str
+    tool_call_name: str
+    tool_call_status: str
+    tool_call_name: str
 
 class ThinkingStartEvent(BaseEvent):
     """
