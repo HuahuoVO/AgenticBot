@@ -63,6 +63,6 @@ def get_life_index(location:str):
         return None
 
 if __name__ == '__main__':
-    result = get_life_index("北京")
+    result = get_real_time_weather("北京")
     #result = get_life_index("beijing")
     print(result)

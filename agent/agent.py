@@ -1,3 +1,4 @@
+import json
 import logging
 from typing import cast, List, Any
 
@@ -10,7 +11,7 @@ from langgraph.prebuilt import create_react_agent
 from langgraph_supervisor import create_supervisor
 from pydantic import BaseModel
 import models.types
-from agent.context import get_tool_call_info, remove_tool_call_info, set_final_message, add_tool_call_info
+from .context import get_tool_call_info, remove_tool_call_info, set_final_message, add_tool_call_info
 
 from models.events import ToolCallStartEvent, ToolCallArgsEvent, ToolCallResultEvent, TextMessageContentEvent, \
     TextMessageEndEvent
@@ -30,7 +31,9 @@ def parse_message_chunk(event, agent, data, context) -> List[BaseModel]:
         name = chunk.name
         if not name and agent:
             name = agent[0].split(":")[0]
+        logging.info(f"Chunk {chunk.name} received")
         if isinstance(chunk, AIMessageChunk):
+            logging.debug(f"Tool call chunks: {chunk.tool_call_chunks}")
             if chunk.tool_call_chunks:
                 tool_call = chunk.tool_call_chunks[0]
                 index = tool_call["index"]
@@ -48,16 +51,16 @@ def parse_message_chunk(event, agent, data, context) -> List[BaseModel]:
                     )
                     stream_msgs.append(
                         ToolCallStartEvent(
-                            toolCallId=tool_call["id"],
-                            toolCallName=tool_call["name"],
+                            tool_call_id=tool_call["id"],
+                            tool_call_name=tool_call['name'] if tool_call['name'] is not None else '-',
                         )
                     )
                 else:
                     stream_msgs.append(
                         ToolCallArgsEvent(
                             delta=tool_call["args"],
-                            toolCallId=tool_call_info["id"],
-                            toolCallName=tool_call_info["name"],
+                            tool_call_id=tool_call_info["id"],
+                            tool_call_name=tool_call_info['name'] if tool_call_info['name'] is not None else '-',
                         )
                     )
             else:
@@ -66,8 +69,8 @@ def parse_message_chunk(event, agent, data, context) -> List[BaseModel]:
                     if name == "summary_agent":
                         stream_msgs.append(
                             TextMessageEndEvent(
-                                delta=chunk.content,
-                                messageId=chunk.id,
+                                delta=json.dumps(chunk.content),
+                                message_id=chunk.id,
                                 name=name,
                                 role=models.types.MessageRoleEnum.AI,
                             )
@@ -76,20 +79,20 @@ def parse_message_chunk(event, agent, data, context) -> List[BaseModel]:
                     else:
                         stream_msgs.append(
                             TextMessageContentEvent(
-                                delta=chunk.content,
-                                messageId=chunk.id,
+                                delta=json.dumps(chunk.content),
+                                message_id=chunk.id,
                                 name=name,
-                                role=models.MessageRoleEnum.AI,
+                                role=models.types.MessageRoleEnum.AI,
                             )
                         )
         elif isinstance(chunk, AIMessage):
             if chunk.content:
                 stream_msgs.append(
                     TextMessageContentEvent(
-                        delta=chunk.content,
+                        delta=json.dumps(chunk.content),
                         messageId=chunk.id,
                         name=chunk.name,
-                        role=models.MessageRoleEnum.AI,
+                        role=models.types.MessageRoleEnum.AI,
                     )
                 )
         elif isinstance(chunk, ToolMessage):
@@ -100,23 +103,24 @@ def parse_message_chunk(event, agent, data, context) -> List[BaseModel]:
             if not delete:
                 stream_msgs.append(
                     ToolCallStartEvent(
-                        toolCallId=tool_call_id,
-                        toolCallName=tool_call_name,
+                        tool_call_id=tool_call_id,
+                        tool_call_name=tool_call_name,
                     )
                 )
                 stream_msgs.append(
                     ToolCallArgsEvent(
                         delta="{}",
-                        toolCallId=tool_call_id,
-                        toolCallName=tool_call_name,
+                        tool_call_id=tool_call_id,
+                        tool_call_name=tool_call_name,
                     )
                 )
+
             stream_msgs.append(
                 ToolCallResultEvent(
-                    delta=chunk.content,
-                    toolCallId=tool_call_id,
-                    toolCallName=tool_call_name,
-                    toolCallStatus=models.ToolCallStatusEnum(chunk.status),
+                    delta=json.dumps(chunk.content),
+                    tool_call_id=tool_call_id,
+                    tool_call_name=tool_call_name,
+                    tool_call_status=chunk.status,
                 )
             )
         else:
@@ -136,13 +140,15 @@ def parse_message_chunk(event, agent, data, context) -> List[BaseModel]:
                             remove_tool_call_info(context, tool_call_id=m.tool_call_id)
                             stream_msgs.append(
                                 ToolCallResultEvent(
-                                    delta=m.content,
-                                    toolCallId=m.tool_call_id,
-                                    toolCallName=m.name,
-                                    toolCallStatus=models.ToolCallStatusEnum(m.status),
+                                    delta=json.dumps(m.content),
+                                    tool_call_id=m.tool_call_id,
+                                    tool_call_name=m.name,
+                                    tool_call_status=m.status,
                                 )
                             )
+    logging.info(f"stream_msgs: {stream_msgs}")
     return stream_msgs
+
 
 def build_tool_description(tools: list[BaseTool]) -> str:
     tool_list = ""

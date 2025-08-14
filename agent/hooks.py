@@ -43,7 +43,7 @@ def get_post_tool_caller_hook(model: BaseChatModel):
                 isinstance(transfer_message, AIMessage)
                 and len(transfer_message.tool_calls) == 1
             ), f"transfer message must be AIMessage with 1 tool call, got {transfer_message}"
-            print(f"transfer message={transfer_message}")
+
             # build fake human message
             # call_tool_message = transfer_message.tool_calls[0]['args']
             # fake_human = HumanMessage(content=json.dumps(call_tool_message))
@@ -53,7 +53,7 @@ def get_post_tool_caller_hook(model: BaseChatModel):
             # 截取这两个之间的消息
             tool_agent_msgs = messages[msg_idx:]
             tool_agent_msgs = [empty_transfer] + tool_agent_msgs
-            print(f"tool_agent_msgs={tool_agent_msgs}")
+
             # 构造LLM的输入提示
             # 这里的提示非常重要，它指导LLM如何总结关键变量
             prompt_messages = [
@@ -66,7 +66,6 @@ def get_post_tool_caller_hook(model: BaseChatModel):
             parser = JsonOutputParser()
 
             var_extractor = json_llm | parser | (lambda x: x.get("variables", {}))
-            print(f"prompt_messages={prompt_messages}")
             response = var_extractor.invoke(prompt_messages)
             avail_vars = state.get("available_vars", {})
             state["available_vars"] = {**avail_vars, **response}
@@ -134,10 +133,6 @@ def pre_tool_caller_hook(state: AgenticBotState):
 
 def post_planner_hook(state: AgenticBotState):
     messages = state["messages"]
-    print(f"state={state}")
-    print(f"messages[-1]={messages[-1]}")
-    print(f"isinstance(messages[-1])={isinstance(messages[-1],AIMessage)}")
-    print(f"messages[-1].name={messages[-1].name}")
     plan_pattern = re.compile(r"<Plan>(.*?)</Plan>", re.DOTALL)
     if isinstance(messages[-1], AIMessage):
 
