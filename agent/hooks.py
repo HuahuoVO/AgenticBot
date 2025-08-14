@@ -1,8 +1,9 @@
+import logging
 import re
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, ToolMessage, SystemMessage, BaseMessage
-from langchain_core.output_parsers import JsonOutputToolsParser
+from langchain_core.output_parsers import JsonOutputToolsParser, JsonOutputParser
 
 from agent.State import AgenticBotState
 
@@ -57,12 +58,12 @@ def get_post_tool_caller_hook(model: BaseChatModel):
             # 这里的提示非常重要，它指导LLM如何总结关键变量
             prompt_messages = [
                 SystemMessage(
-                    content=f"You are an AI assistant tasked with identifying and summarizing key variables from a conversation history. These variables could be user intentions, specific entities (like names, dates, product IDs), important parameters (like product names, product images, product brand, product IDs, etc.), or any information crucial for further processing. Note that only new variables are retained; variables existing in current available do not need to be saved again. Return the variables in a JSON format like: {{'variables': {{'var1': 'value1', 'var2': 'value2'}}}}\n curent available vars are: {state.get('available_vars', {})}"
+                    content=f"You are an AI assistant tasked with identifying and summarizing key variables from a conversation history. These variables could be user intentions, specific entities (like location, dates), important parameters (like product names, product images, product brand, product IDs, etc.), or any information crucial for further processing. Note that only new variables are retained; variables existing in current available do not need to be saved again. Return the variables in a JSON format like: {{'variables': {{'var1': 'value1', 'var2': 'value2'}}}}\n curent available vars are: {state.get('available_vars', {})}"
                 ),
                 *tool_agent_msgs,
             ]
 
-            parser = JsonOutputToolsParser()
+            parser = JsonOutputParser()
 
             var_extractor = json_llm | parser | (lambda x: x.get("variables", {}))
             print(f"prompt_messages={prompt_messages}")
@@ -100,12 +101,10 @@ def get_post_tool_caller_hook(model: BaseChatModel):
 
 def pre_tool_caller_hook(state: AgenticBotState):
     full_msgs: list[BaseMessage] = state["messages"]
-
     # 只需要拿到supervisor交给自己的任务，忽略其他上下文，手动实现filter
     # 找到最新的，name是supervisor的AIMessage
     msg_idx = len(full_msgs) - 1
     for msg in reversed(full_msgs):
-        print(f"msg_idx={msg_idx}, msg={msg}, full_msgs={full_msgs}, msg_name={msg.name}")
         if isinstance(msg, ToolMessage) and msg.name == "transfer_to_tools_agent":
             # hand off message
             break
@@ -180,10 +179,10 @@ def post_planner_hook(state: AgenticBotState):
         # else:
         #     plan = result
     state["plan"] = plan if plan != "" else state.get("plan", "")
-
+    state["prev_reflect"] = []
     return state
 
 
 def pre_planner_hook(state: AgenticBotState):
     # 相关信息都在system prompt里面，这里直接把交互信息等删除，减少上下文
-    return {"llm_input_messages": []}
+    return {"llm_input_messages": {}}

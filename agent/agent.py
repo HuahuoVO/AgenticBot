@@ -4,11 +4,11 @@ from typing import cast, List, Any
 
 from langchain_core.messages import ToolMessage, BaseMessage, AIMessage, AIMessageChunk
 from langchain_core.tools import BaseTool
+from langchain_openai import ChatOpenAI
 from langgraph._internal._runnable import RunnableCallable
 from langgraph.prebuilt import create_react_agent
 from langgraph_supervisor import create_supervisor
 from pydantic import BaseModel
-from langchain_ollama import ChatOllama
 import models.types
 from agent.context import get_tool_call_info, remove_tool_call_info, set_final_message, add_tool_call_info
 
@@ -19,10 +19,8 @@ from tools.mcp_tools import get_real_time_weather, get_life_index
 ToolCallArgsEvent, ToolCallStartEvent, TextMessageContentEvent
 from agent.State import AgenticBotState
 from agent.hooks import pre_tool_caller_hook, get_post_tool_caller_hook, post_planner_hook, pre_planner_hook
-from agent.prompts import tool_call_system_prompt, supervisor_prompt, planner_system_prompt, summary_agent_system_prompt
-
-
-
+from agent.prompts import tool_call_system_prompt, supervisor_prompt, planner_system_prompt, \
+    summary_agent_system_prompt, supervisor_system_prompt
 
 
 def parse_message_chunk(event, agent, data, context) -> List[BaseModel]:
@@ -152,7 +150,7 @@ def build_tool_description(tools: list[BaseTool]) -> str:
         tool_list += f"{tool.name}: {tool.description}\n"
     return tool_list
 
-def create_agentic_bot(llm: ChatOllama):
+def create_agentic_bot(llm: ChatOpenAI):
     post_tool_caller_hook = get_post_tool_caller_hook(llm)
     tools_agent = create_react_agent(
         model=llm,
@@ -163,7 +161,7 @@ def create_agentic_bot(llm: ChatOllama):
         post_model_hook=post_tool_caller_hook,
         state_schema=AgenticBotState
     )
-    tool_list = build_tool_description([get_real_time_weather, get_life_index])
+    tool_list = build_tool_description([])
     planner_prompt = RunnableCallable(
         lambda state: [
                           {
@@ -181,8 +179,8 @@ def create_agentic_bot(llm: ChatOllama):
     )
     planer_agent = create_react_agent(
         model=llm,
-        tools=[get_real_time_weather, get_life_index],
-        prompt=planner_prompt,
+        tools=[],
+        prompt=planner_system_prompt,
         pre_model_hook=pre_planner_hook,
         post_model_hook=post_planner_hook,
         name="planner_agent",
@@ -202,7 +200,7 @@ def create_agentic_bot(llm: ChatOllama):
         add_handoff_back_messages=True,
         output_mode="full_history",
         state_schema=AgenticBotState,
-        prompt=supervisor_prompt
+        prompt=supervisor_system_prompt
     ).compile()
 
     return supervisor
