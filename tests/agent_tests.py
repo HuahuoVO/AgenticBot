@@ -1,20 +1,12 @@
 import logging
 
 import pydantic
-from dataclasses_json.mm import JsonData
 from langchain_openai import ChatOpenAI
-from starlette.responses import StreamingResponse
 # 设置日志级别为 ERROR，这样会忽略 WARNING 及以下级别的日志
 logging.basicConfig(level=logging.ERROR)
-from agent import context
 from agent.agent import create_agentic_bot, parse_message_chunk
 from agent.context import create_context
 from models.request_model import ChatRequest
-from langchain_ollama import ChatOllama
-import json
-# llm = ChatOllama(
-#     model="mistral"
-# )
 print(pydantic.VERSION)
 llm = ChatOpenAI(
     #openai_api_base="https://jeniya.top/v1",
@@ -29,10 +21,11 @@ llm = ChatOpenAI(
 #     model="doubao-1-5-pro-32k-250115",
 #     openai_api_key="50436179-01ec-4441-831d-6e244398a7ef"
 # )
-def chat(request: ChatRequest):
+def chat_agents(request: ChatRequest):
     supervisor = create_agentic_bot(llm=llm)
+    print(request)
     for agent, event, data in supervisor.stream(
-            stream_mode=["messages", "updates"],
+            stream_mode=["messages"],
             input=
             {
                 "messages": [
@@ -49,11 +42,12 @@ def chat(request: ChatRequest):
     ):
         context = create_context()
         content = parse_message_chunk(event, agent, data, context)
+        print(content)
         for msg in content:
-            print(f"msg: {msg.model_dump_json()}")
+           print(msg.model_dump_json())
 
 if __name__ == "__main__":
     req = ChatRequest(
         message="北京今天天气怎么样? 生活指数怎么样？"
     )
-    chat(req)
+    chat_agents(req)
